@@ -1,5 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+} from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import { format, parseISO } from 'date-fns';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -10,6 +36,7 @@ function App() {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Sample forex messages for testing
   const sampleMessages = [
@@ -100,8 +127,78 @@ function App() {
     }
   };
 
+  const exportData = async (format) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/export/${format}`);
+      const blob = await response.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `forex_signals.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(`Error exporting ${format}:`, error);
+      alert(`Error exporting ${format}`);
+    }
+  };
+
   const useSampleMessage = (sampleMsg) => {
     setMessage(sampleMsg);
+  };
+
+  // Chart configurations
+  const symbolsChartData = analytics ? {
+    labels: Object.keys(analytics.symbols_breakdown),
+    datasets: [
+      {
+        label: 'Signals Count',
+        data: Object.values(analytics.symbols_breakdown),
+        backgroundColor: [
+          '#3B82F6', '#10B981', '#F59E0B', '#EF4444', 
+          '#8B5CF6', '#06B6D4', '#84CC16', '#F97316'
+        ],
+        borderWidth: 1,
+      },
+    ],
+  } : null;
+
+  const sentimentChartData = analytics ? {
+    labels: Object.keys(analytics.sentiment_breakdown),
+    datasets: [
+      {
+        data: Object.values(analytics.sentiment_breakdown),
+        backgroundColor: ['#10B981', '#EF4444', '#6B7280'],
+        borderWidth: 2,
+      },
+    ],
+  } : null;
+
+  const dailyChartData = analytics ? {
+    labels: Object.keys(analytics.daily_breakdown).sort(),
+    datasets: [
+      {
+        label: 'Daily Signals',
+        data: Object.keys(analytics.daily_breakdown)
+          .sort()
+          .map(date => analytics.daily_breakdown[date]),
+        borderColor: '#3B82F6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+      },
+    ],
+  } : null;
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+    },
   };
 
   return (
@@ -110,204 +207,325 @@ function App() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
-            🔍 Forex Signal Extractor
+            🚀 Advanced Forex Signal Analyzer
           </h1>
           <p className="text-gray-600 text-lg">
-            Powered by Google Gemini AI • Extract structured signals from trading messages
+            AI-Powered Signal Extraction • Advanced Analytics • Export & Tracking
           </p>
         </div>
 
-        {/* Analytics Dashboard */}
-        {analytics && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <div className="text-3xl font-bold text-blue-600">{analytics.total_signals}</div>
-              <div className="text-gray-600">Total Signals</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <div className="text-3xl font-bold text-green-600">{analytics.buy_signals}</div>
-              <div className="text-gray-600">Buy Signals</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <div className="text-3xl font-bold text-red-600">{analytics.sell_signals}</div>
-              <div className="text-gray-600">Sell Signals</div>
-            </div>
-            <div className="bg-white rounded-xl shadow-md p-6 text-center">
-              <div className="text-3xl font-bold text-purple-600">
-                {analytics.avg_tp_sl_ratio ? analytics.avg_tp_sl_ratio.toFixed(2) : 'N/A'}
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white rounded-lg p-1 shadow-md">
+            {['dashboard', 'extract', 'analytics', 'signals'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-md font-medium capitalize transition-colors ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && analytics && (
+          <div className="space-y-8">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <div className="text-3xl font-bold text-blue-600">{analytics.total_signals}</div>
+                <div className="text-gray-600">Total Signals</div>
               </div>
-              <div className="text-gray-600">Avg TP/SL Ratio</div>
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <div className="text-3xl font-bold text-green-600">{analytics.buy_signals}</div>
+                <div className="text-gray-600">Buy Signals</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <div className="text-3xl font-bold text-red-600">{analytics.sell_signals}</div>
+                <div className="text-gray-600">Sell Signals</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <div className="text-3xl font-bold text-purple-600">
+                  {analytics.avg_quality_score ? (analytics.avg_quality_score * 100).toFixed(0) + '%' : 'N/A'}
+                </div>
+                <div className="text-gray-600">Avg Quality</div>
+              </div>
+              <div className="bg-white rounded-xl shadow-md p-6 text-center">
+                <div className="text-3xl font-bold text-orange-600">
+                  {analytics.avg_tp_sl_ratio ? analytics.avg_tp_sl_ratio.toFixed(2) : 'N/A'}
+                </div>
+                <div className="text-gray-600">TP/SL Ratio</div>
+              </div>
+            </div>
+
+            {/* Export Buttons */}
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">📊 Export Data</h3>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => exportData('csv')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  📄 Export CSV
+                </button>
+                <button
+                  onClick={() => exportData('json')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  📋 Export JSON
+                </button>
+                <button
+                  onClick={clearAllSignals}
+                  className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                >
+                  🗑️ Clear All
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Input Section */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">📝 Extract Signal</h2>
-          
-          {/* Sample Messages */}
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-2">Try these sample messages:</p>
-            <div className="flex flex-wrap gap-2">
-              {sampleMessages.map((sample, index) => (
-                <button
-                  key={index}
-                  onClick={() => useSampleMessage(sample)}
-                  className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg transition-colors"
-                >
-                  Sample {index + 1}
-                </button>
-              ))}
+        {/* Extract Tab */}
+        {activeTab === 'extract' && (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">📝 Extract Signal</h2>
+            
+            {/* Sample Messages */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">Try these sample messages:</p>
+              <div className="flex flex-wrap gap-2">
+                {sampleMessages.map((sample, index) => (
+                  <button
+                    key={index}
+                    onClick={() => useSampleMessage(sample)}
+                    className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg transition-colors"
+                  >
+                    Sample {index + 1}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Group Name
-              </label>
-              <input
-                type="text"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter group name..."
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Trading Message
-              </label>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                rows="4"
-                placeholder="Paste your forex trading message here..."
-              />
-            </div>
-            
-            <div className="flex gap-3">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Group Name
+                </label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter group name..."
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Trading Message
+                </label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="4"
+                  placeholder="Paste your forex trading message here..."
+                />
+              </div>
+              
               <button
                 onClick={extractSignal}
                 disabled={extracting || !message.trim()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
               >
                 {extracting ? '🔄 Extracting...' : '🚀 Extract Signal'}
               </button>
-              
-              <button
-                onClick={clearAllSignals}
-                className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-              >
-                🗑️ Clear All
-              </button>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Signals Table */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-800">📊 Extracted Signals</h2>
-          </div>
-          
-          {signals.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="text-6xl mb-4">📭</div>
-              <p className="text-xl">No signals extracted yet</p>
-              <p className="text-sm">Try extracting a signal from a trading message above</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Symbol
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Action
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Entry
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      TP1/TP2/TP3
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      SL
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Group
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Confidence
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {signals.map((signal) => (
-                    <tr key={signal.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {signal.symbol}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          signal.action === 'BUY' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {signal.action}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {signal.entry || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {[signal.tp1, signal.tp2, signal.tp3].filter(Boolean).join(' / ') || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {signal.sl || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {signal.group_name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {signal.confidence ? `${(signal.confidence * 100).toFixed(0)}%` : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button
-                          onClick={() => deleteSignal(signal.id)}
-                          className="text-red-600 hover:text-red-900 text-sm"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Symbol Distribution */}
-        {analytics && Object.keys(analytics.symbols_breakdown).length > 0 && (
-          <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">📈 Symbol Distribution</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(analytics.symbols_breakdown).map(([symbol, count]) => (
-                <div key={symbol} className="text-center p-3 bg-gray-50 rounded-lg">
-                  <div className="text-lg font-bold text-blue-600">{count}</div>
-                  <div className="text-sm text-gray-600">{symbol}</div>
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && analytics && (
+          <div className="space-y-8">
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Symbols Distribution */}
+              {symbolsChartData && (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">📈 Symbols Distribution</h3>
+                  <Bar data={symbolsChartData} options={chartOptions} />
                 </div>
-              ))}
+              )}
+
+              {/* Sentiment Analysis */}
+              {sentimentChartData && (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-xl font-bold text-gray-800 mb-4">🎯 Market Sentiment</h3>
+                  <Pie data={sentimentChartData} options={chartOptions} />
+                </div>
+              )}
             </div>
+
+            {/* Daily Activity */}
+            {dailyChartData && (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">📅 Daily Signal Activity</h3>
+                <Line data={dailyChartData} options={chartOptions} />
+              </div>
+            )}
+
+            {/* Performance Metrics */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">⚡ Performance Metrics</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {analytics.performance_metrics.total_symbols}
+                  </div>
+                  <div className="text-sm text-gray-600">Total Symbols</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {analytics.performance_metrics.signals_per_day.toFixed(1)}
+                  </div>
+                  <div className="text-sm text-gray-600">Signals/Day</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {analytics.performance_metrics.buy_sell_ratio.toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-600">Buy/Sell Ratio</div>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {analytics.performance_metrics.avg_risk_reward ? 
+                      analytics.performance_metrics.avg_risk_reward.toFixed(2) : 'N/A'}
+                  </div>
+                  <div className="text-sm text-gray-600">Avg Risk/Reward</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Signals Tab */}
+        {activeTab === 'signals' && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800">📊 Extracted Signals</h2>
+            </div>
+            
+            {signals.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-6xl mb-4">📭</div>
+                <p className="text-xl">No signals extracted yet</p>
+                <p className="text-sm">Go to Extract tab to add signals</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Symbol
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Action
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Entry
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        TP Levels
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        SL
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quality
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Sentiment
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        R/R
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {signals.map((signal) => (
+                      <tr key={signal.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {signal.symbol}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            signal.action === 'BUY' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {signal.action}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {signal.entry || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {[signal.tp1, signal.tp2, signal.tp3].filter(Boolean).join(' / ') || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {signal.sl || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {signal.quality_score ? 
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              signal.quality_score > 0.8 ? 'bg-green-100 text-green-800' :
+                              signal.quality_score > 0.6 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {(signal.quality_score * 100).toFixed(0)}%
+                            </span>
+                            : 'N/A'
+                          }
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {signal.sentiment ? 
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              signal.sentiment === 'BULLISH' ? 'bg-green-100 text-green-800' :
+                              signal.sentiment === 'BEARISH' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {signal.sentiment}
+                            </span>
+                            : 'N/A'
+                          }
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {signal.risk_reward_ratio ? signal.risk_reward_ratio.toFixed(2) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <button
+                            onClick={() => deleteSignal(signal.id)}
+                            className="text-red-600 hover:text-red-900 text-sm"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
