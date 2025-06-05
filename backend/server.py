@@ -102,7 +102,17 @@ ONLY return valid JSON, no explanations."""
         
         # Parse the JSON response
         try:
-            signal_data = json.loads(response.strip())
+            # Clean the response - remove markdown formatting if present
+            response_clean = response.strip()
+            
+            # Remove markdown code blocks if present
+            if "```json" in response_clean:
+                response_clean = response_clean.split("```json")[1].split("```")[0].strip()
+            elif "```" in response_clean:
+                response_clean = response_clean.split("```")[1].split("```")[0].strip()
+            
+            print(f"Cleaned response: {response_clean}")
+            signal_data = json.loads(response_clean)
             
             if "error" in signal_data:
                 return None
