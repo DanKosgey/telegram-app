@@ -222,6 +222,12 @@ class ForexSignalAPITester:
         except Exception as e:
             print(f"❌ Failed - Error: {str(e)}")
             return False
+            
+    def cleanup(self):
+        """Clean up any created signals"""
+        if self.signals_created:
+            print(f"\n🧹 Cleaning up {len(self.signals_created)} signals...")
+            self.test_clear_all_signals()
 
 def main():
     # Get backend URL from frontend .env
