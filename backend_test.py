@@ -104,7 +104,23 @@ class ForexSignalAPITester:
             200
         )
         if success:
-            print(f"✅ Analytics retrieved: {response}")
+            print(f"✅ Analytics retrieved successfully")
+            # Check for new analytics fields
+            if "avg_quality_score" in response:
+                print(f"✅ Quality Score analytics present: {response.get('avg_quality_score')}")
+            else:
+                print("❌ Quality Score analytics missing")
+                
+            if "sentiment_breakdown" in response:
+                print(f"✅ Sentiment breakdown present: {response.get('sentiment_breakdown')}")
+            else:
+                print("❌ Sentiment breakdown missing")
+                
+            if "performance_metrics" in response and "avg_risk_reward" in response.get("performance_metrics", {}):
+                print(f"✅ Risk/Reward metrics present: {response.get('performance_metrics').get('avg_risk_reward')}")
+            else:
+                print("❌ Risk/Reward metrics missing")
+                
             return True, response
         return False, {}
 
