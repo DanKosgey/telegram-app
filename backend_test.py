@@ -221,6 +221,22 @@ def main():
         success, signal = tester.test_extract_signal(message, group_name)
         if success:
             print(f"✅ Sample {i+1} extraction successful")
+            # Check for new fields in the signal
+            if signal:
+                if "quality_score" in signal and signal["quality_score"] is not None:
+                    print(f"✅ Quality Score present: {signal['quality_score']}")
+                else:
+                    print("❌ Quality Score missing")
+                    
+                if "sentiment" in signal and signal["sentiment"] is not None:
+                    print(f"✅ Sentiment present: {signal['sentiment']}")
+                else:
+                    print("❌ Sentiment missing")
+                    
+                if "risk_reward_ratio" in signal and signal["risk_reward_ratio"] is not None:
+                    print(f"✅ Risk/Reward Ratio present: {signal['risk_reward_ratio']}")
+                else:
+                    print("❌ Risk/Reward Ratio missing")
         else:
             print(f"❌ Sample {i+1} extraction failed")
     
@@ -229,6 +245,10 @@ def main():
     
     # Test analytics
     tester.test_get_analytics()
+    
+    # Test export endpoints
+    tester.test_export_csv()
+    tester.test_export_json()
     
     # Test deleting a signal if we have any
     if tester.signals_created:
