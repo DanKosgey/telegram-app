@@ -187,11 +187,41 @@ class ForexSignalAPITester:
             print(f"❌ Failed - Error: {str(e)}")
             return False
             
-    def cleanup(self):
-        """Clean up any created signals"""
-        if self.signals_created:
-            print(f"\n🧹 Cleaning up {len(self.signals_created)} signals...")
-            self.test_clear_all_signals()
+    def test_export_json(self):
+        """Test exporting signals to JSON"""
+        print(f"\n🔍 Testing Export to JSON...")
+        url = f"{self.base_url}/api/export/json"
+        
+        try:
+            response = requests.get(url)
+            success = response.status_code == 200
+            
+            if success:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                print(f"✅ Content-Type: {response.headers.get('Content-Type')}")
+                print(f"✅ Content-Disposition: {response.headers.get('Content-Disposition')}")
+                
+                # Check if we got JSON content
+                if response.headers.get('Content-Type') == 'application/json' and 'forex_signals.json' in response.headers.get('Content-Disposition', ''):
+                    try:
+                        json_data = response.json()
+                        print(f"✅ JSON export successful - {len(json_data.get('signals', []))} signals exported")
+                        print(f"✅ JSON contains metadata: export_timestamp={json_data.get('export_timestamp')}, total_signals={json_data.get('total_signals')}")
+                        return True
+                    except json.JSONDecodeError:
+                        print("❌ Response is not valid JSON")
+                else:
+                    print("❌ Response doesn't appear to be a valid JSON file")
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                print(f"Response: {response.text}")
+            
+            return success
+            
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            return False
 
 def main():
     # Get backend URL from frontend .env
